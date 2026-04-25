@@ -72,8 +72,11 @@ export function generateExposes(options: NormalizedModuleFederationOptions) {
         return `
         ${JSON.stringify(key)}: async () => {
           await injectCssAssets(${JSON.stringify(key)})
+          const __hmrTs = globalThis.__mf_hmr_timestamp__;
           const importModule = await importExposedModule(
-            () => import(${JSON.stringify(options.exposes[key].import)})
+            __hmrTs
+              ? () => import(/* @vite-ignore */ new URL(import.meta.url).origin + ${JSON.stringify('/' + options.exposes[key].import.replace(/^\\.\//, ''))} + '?t=' + __hmrTs)
+              : () => import(${JSON.stringify(options.exposes[key].import)})
           )
           const exportModule = {}
           Object.assign(exportModule, importModule)

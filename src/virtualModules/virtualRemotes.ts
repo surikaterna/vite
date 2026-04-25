@@ -57,6 +57,7 @@ if (import.meta.hot) {
       }
     }
 
+    globalThis.__mf_hmr_timestamp__ = Date.now();
     window.dispatchEvent(new CustomEvent('mf:remote-updated', {
       detail: { remote: ${JSON.stringify(remoteName)}, module: ${JSON.stringify(id)} },
     }));
