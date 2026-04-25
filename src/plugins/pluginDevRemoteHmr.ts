@@ -175,8 +175,6 @@ export default function pluginDevRemoteHmr(options: NormalizedModuleFederationOp
         const broadcast = (file: string) => {
           if (shouldIgnoreFile(file, options)) return;
 
-          invalidateRemoteModuleGraph(server);
-
           server.ws.send({
             type: 'custom',
             event: REMOTE_HMR_EVENT,
