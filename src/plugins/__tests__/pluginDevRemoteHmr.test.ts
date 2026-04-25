@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import pluginDevRemoteHmr from '../pluginDevRemoteHmr';
 import { normalizeModuleFederationOptions } from '../../utils/normalizeModuleFederationOptions';
 import { callHook } from '../../utils/__tests__/viteHookHelpers';
+
 const { mfWarn } = vi.hoisted(() => ({
   mfWarn: vi.fn(),
 }));
@@ -230,7 +231,7 @@ describe('pluginDevRemoteHmr', () => {
     expect(server.watcher.off).toHaveBeenCalledTimes(3);
   });
 
-  it('connects host to remote hmr websocket and triggers full reload', async () => {
+  it('connects host to remote hmr websocket and sends custom event on remote change', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -282,17 +283,21 @@ describe('pluginDevRemoteHmr', () => {
       data: JSON.stringify({
         type: 'custom',
         event: 'mf:remote-update',
-        data: { file: '/src/Button.tsx' },
+        data: { remote: 'remoteApp', file: '/src/Button.tsx' },
       }),
     });
 
-    expect(server.ws.send).toHaveBeenCalledWith({ type: 'full-reload' });
+    expect(server.ws.send).toHaveBeenCalledWith({
+      type: 'custom',
+      event: 'mf:remote-invalidate',
+      data: { remote: 'remoteApp', ts: expect.any(Number) },
+    });
 
     close();
     expect(socket.close).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers full reload for host local file changes', async () => {
+  it('does not intercept host local file changes (delegates to Vite native HMR)', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -326,7 +331,6 @@ describe('pluginDevRemoteHmr', () => {
     emit('change', '/node_modules/vue/index.js');
     emit('change', '/src/__mf__virtual/chunk.js');
 
-    expect(server.ws.send).toHaveBeenCalledWith({ type: 'full-reload' });
-    expect(server.ws.send).toHaveBeenCalledTimes(1);
+    expect(server.ws.send).not.toHaveBeenCalled();
   });
 });

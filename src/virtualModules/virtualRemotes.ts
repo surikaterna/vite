@@ -28,6 +28,42 @@ export function addUsedRemote(remoteKey: string, remoteModule: string) {
 export function getUsedRemotesMap() {
   return usedRemotesMap;
 }
+function generateHmrBlock(id: string) {
+  const remoteName = id.includes('/') ? id.split('/')[0] : id;
+  const pendingKey = `__mf_pending__${id}`;
+  return `
+if (import.meta.hot) {
+  import.meta.hot.on('mf:remote-invalidate', (data) => {
+    if (data.remote !== ${JSON.stringify(remoteName)}) return;
+
+    delete __mfModuleCache.remote[${JSON.stringify(id)}];
+    delete __mfModuleCache.remote[${JSON.stringify(pendingKey)}];
+
+    const __mfFederation = globalThis.__FEDERATION__;
+    if (__mfFederation && __mfFederation.__INSTANCES__) {
+      for (const inst of __mfFederation.__INSTANCES__) {
+        if (inst.moduleCache && inst.moduleCache.delete) {
+          inst.moduleCache.delete(${JSON.stringify(remoteName)});
+        }
+      }
+    }
+
+    const __mfGlobalLoading = globalThis.__GLOBAL_LOADING_REMOTE_ENTRY__;
+    if (__mfGlobalLoading) {
+      for (const key of Object.keys(__mfGlobalLoading)) {
+        if (key.startsWith(${JSON.stringify(remoteName + ':')})) {
+          delete __mfGlobalLoading[key];
+        }
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('mf:remote-updated', {
+      detail: { remote: ${JSON.stringify(remoteName)}, module: ${JSON.stringify(id)} },
+    }));
+  });
+}`;
+}
+
 export function generateRemotes(id: string, command: string) {
   const useReactProxy = command === 'serve' && hasPackageDependency('react');
   const reactImportLine = useReactProxy ? `import * as __mfReact from "react";` : '';
@@ -174,5 +210,6 @@ export default exportModule?.__esModule ? exportModule.default : exportModule.de
       }
     }
     ${exportLine}
+    ${command === 'serve' ? generateHmrBlock(id) : ''}
   `;
 }

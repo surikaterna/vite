@@ -41,6 +41,26 @@ describe('generateRemotes', () => {
     );
   });
 
+  it('includes HMR event listener block in dev mode', () => {
+    const code = generateRemotes('remote/Button', 'serve');
+
+    expect(code).toContain('import.meta.hot');
+    expect(code).toContain('import.meta.hot.on');
+    expect(code).toContain('mf:remote-invalidate');
+    expect(code).toContain('mf:remote-updated');
+    expect(code).toContain('__mfModuleCache.remote["remote/Button"]');
+    expect(code).toContain('__mfModuleCache.remote["__mf_pending__remote/Button"]');
+    expect(code).toContain('__FEDERATION__');
+    expect(code).toContain('__GLOBAL_LOADING_REMOTE_ENTRY__');
+    expect(code).toContain('"remote:"');
+  });
+
+  it('does not include HMR dispose block in build mode', () => {
+    const code = generateRemotes('remote/Button', 'build');
+
+    expect(code).not.toContain('import.meta.hot');
+  });
+
   it('uses ESM remote wrappers in Rollup build mode', () => {
     const virtual = getRemoteVirtualModule('remote/Card', 'build');
 

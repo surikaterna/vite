@@ -210,6 +210,15 @@ export default function pluginDevRemoteHmr(options: NormalizedModuleFederationOp
           reconnectTimers.set(remoteName, timer);
         };
 
+        const notifyRemoteUpdate = (broadcastRemoteName: string | undefined) => {
+          if (!broadcastRemoteName) return;
+          server.ws.send({
+            type: 'custom',
+            event: 'mf:remote-invalidate',
+            data: { remote: broadcastRemoteName, ts: Date.now() },
+          });
+        };
+
         const connectRemote = async (
           remoteName: string,
           remote: { entry: string },
@@ -246,7 +255,7 @@ export default function pluginDevRemoteHmr(options: NormalizedModuleFederationOp
             ws.onmessage = (rawEvent: { data: unknown }) => {
               const message = parseRemoteHmrMessage(rawEvent.data);
               if (!message || message.event !== REMOTE_HMR_EVENT) return;
-              server.ws.send({ type: 'full-reload' });
+              notifyRemoteUpdate(message.data?.remote);
             };
             ws.onopen = () => clearReconnectTimer(remoteName);
             ws.onerror = (error) => mfWarn(`Remote HMR socket error for "${remoteName}":`, error);
@@ -278,15 +287,6 @@ export default function pluginDevRemoteHmr(options: NormalizedModuleFederationOp
         for (const [remoteName, remote] of Object.entries(options.remotes)) {
           void connectRemote(remoteName, remote);
         }
-
-        const triggerHostReload = (file: string) => {
-          if (shouldIgnoreFile(file, options)) return;
-          server.ws.send({ type: 'full-reload' });
-        };
-
-        server.watcher.on('change', triggerHostReload);
-        server.watcher.on('add', triggerHostReload);
-        server.watcher.on('unlink', triggerHostReload);
 
         server.httpServer?.once('close', teardown);
       }
