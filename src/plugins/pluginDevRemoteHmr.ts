@@ -117,6 +117,26 @@ function getStringPreview(value: unknown, max = 180) {
   return rawValue.slice(0, max);
 }
 
+/**
+ * Invalidate the entire Vite module graph so that every module is
+ * re-transformed on the next request. This is necessary for cross-federation
+ * HMR because Vite's standard invalidation stops at React Fast Refresh
+ * boundaries — intermediate modules keep stale transforms with old ?t= import
+ * URLs, causing the browser to serve cached (stale) modules.
+ */
+function invalidateRemoteModuleGraph(server: ViteDevServer) {
+  const timestamp = Date.now();
+  if (!server.moduleGraph?.idToModuleMap) return;
+  for (const mod of server.moduleGraph.idToModuleMap.values()) {
+    server.moduleGraph.invalidateModule(mod, undefined, timestamp, true);
+    // Ensure lastHMRTimestamp is updated even on older Vite versions
+    // that may not support the isHmr parameter
+    if (mod.lastHMRTimestamp < timestamp) {
+      mod.lastHMRTimestamp = timestamp;
+    }
+  }
+}
+
 function isRemoteHmrEnabled(dev: NormalizedModuleFederationOptions['dev']) {
   return typeof dev === 'object' && dev !== null && dev.remoteHmr === true;
 }
@@ -154,6 +174,8 @@ export default function pluginDevRemoteHmr(options: NormalizedModuleFederationOp
 
         const broadcast = (file: string) => {
           if (shouldIgnoreFile(file, options)) return;
+
+          invalidateRemoteModuleGraph(server);
 
           server.ws.send({
             type: 'custom',
