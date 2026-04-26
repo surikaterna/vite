@@ -145,6 +145,19 @@ export default function pluginDevRemoteHmr(options: NormalizedModuleFederationOp
   return {
     name: 'module-federation-dev-remote-hmr',
     apply: 'serve',
+
+    // Suppress Vite's standard HMR propagation for remote source files.
+    // Without this, Vite sends full-reload when a module change can't be
+    // hot-updated (hits a non-component boundary in the module graph).
+    // Our custom broadcast() already notifies the host through the WS
+    // channel, which triggers a targeted remount instead.
+    handleHotUpdate({ file }) {
+      if (!isRemoteHmrEnabled(options.dev)) return;
+      if (Object.keys(options.exposes).length === 0) return;
+      if (shouldIgnoreFile(file, options)) return;
+      return [];
+    },
+
     configureServer(server) {
       if (!isRemoteHmrEnabled(options.dev)) return;
 
